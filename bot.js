@@ -126,6 +126,8 @@ var game = new SecretHitlerBot(privatedata.url, function (res){
 			}
 			var data = msg.data.split("_");
 			if (data[0] == "join"){
+					console.log(msg);
+					console.log(msg.message.entities);
 				if (res.playing){
 					bot.answerCallbackQuery(msg.id, "Ya estas participando en una partida.");
 					return;
@@ -150,8 +152,19 @@ var game = new SecretHitlerBot(privatedata.url, function (res){
 						}
 						return;
 					}
-					//ToDo: añadir el nuevo miembro al mensaje
-					//bot.editMessageText("", {chat_id: msg.message.chat.id, message_id: msg.message.message_id});
+					//ToDo: asignar extras al player 
+					var opts = {
+						chat_id: msg.message.chat.id, 
+						message_id: msg.message.message_id,
+						reply_markup: JSON.stringify({
+							inline_keyboard: [
+								[{text: "Unirse a la partida", callback_data: "join_"+data[1]}],
+								[{text: "Borrar la partida", callback_data: "delete_"+data[1]}],
+								[{text: "Iniciar la partida", callback_data: "start_"+data[1]}]
+							]
+						})
+					};
+					bot.editMessageText(msg.message.text+"\n"+res.msg.username, opts);
 					bot.answerCallbackQuery(msg.id, 'Te has unido correctamente a la partida.');
 					//Creamos el array de botones para gestionar el grupo
 					var opts = {
