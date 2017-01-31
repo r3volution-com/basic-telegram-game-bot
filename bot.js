@@ -1,15 +1,14 @@
-//ToDo: menos spam usando el editar mensaje de la API2.0
 //Cargamos los modulos necesarios
 var TelegramBot = require('node-telegram-bot-api');
 var privatedata = require('./privatedata');
-var SecretHitlerBot = require('./game');
+var GameBot = require('./game');
 var emoji = require('node-emoji').emoji;
 
 //Iniciamos el bot y mongodb
 var bot = new TelegramBot(privatedata.token, {polling: true});
 
 //Iniciamos el Bot
-var game = new SecretHitlerBot(privatedata.url, function (res){
+var game = new GameBot(privatedata.url, function (res){
 	if (res.status == "ERR") {
 		console.error('No se ha podido conectar a la base de datos');
 		return;
@@ -105,11 +104,8 @@ var game = new SecretHitlerBot(privatedata.url, function (res){
 			});
 		});
 	});
+	//Si recibimos una callbackQuery
 	bot.on('callback_query', function (msg) {
-		/*if (msg.message.chat.type == "private") {
-			bot.answerCallbackQuery(msg.id, "Por favor envia este comando por un grupo.");
-			return;
-		}*/
 		game.getUser(msg.from.id, function (res){
 			//Capturamos errores
 			if (res.status == "ERR") {
