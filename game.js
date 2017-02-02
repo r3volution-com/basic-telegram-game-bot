@@ -110,7 +110,7 @@ method.joinGame = function(data, callback){
 			callback({status: "ERR", msg: "ERR_ALREADY_STARTED"});
 			return;
 		}
-		g_object.db.count('playersxgame', {game_id: r_game[0].game_id}, function(count_players){
+		g_object.db.count('playersxgame', {game_id: g_object.db.getObjectId(data.game_id)}, function(count_players){
 			//Comprobamos que la sala no este llena
 			if (count_players >= r_game[0].n_players){
 				callback({status: "ERR", msg: "ERR_ALREADY_FILLED", data: count_players+" >= "+r_game[0].n_players});
@@ -120,7 +120,7 @@ method.joinGame = function(data, callback){
 			data.order = count_players+1;
 			//Insertamos en la base de datos
 			g_object.db.insert('playersxgame', data, function(){
-				callback({status: "OK", data: {game_id: r_game[0].game_id}});
+				callback({status: "OK"});
 			});
 		});
 	});
@@ -138,7 +138,7 @@ method.startGame = function (player_id, game_id, callback){
 		}
 		//En el caso de que tenga una partida comprueba que el usuario que la borra es el mismo que la creo.
 		if (r_game[0].creator_id.toString() != player_id.toString()){
-			callback({status: "ERR", msg: "ERR_NOT_CREATOR_START", extra: {creator_name: r_game[0].creator_name}});
+			callback({status: "ERR", msg: "ERR_NOT_CREATOR_START"});
 			return;
 		}
 		//Comprobamos
