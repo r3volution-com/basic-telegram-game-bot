@@ -2,19 +2,6 @@
 //ToDo: Donde entra por parametro r_game hay que limitar la informacion que recibe a solo la que va a usar
 var Db = require('./db');
 
-//////////AUX FUNCTIONS//////////
-function inArray(array, key, value){
-	existe = false;
-	for (i = 0; i<array.length && !existe; i++){
-		if (array[i][key] === value) existe = true;
-	}
-	return existe;
-}
-function shuffleArray(array){
-    for(var j, x, i = array.length; i; j = Math.floor(Math.random() * i), x = array[--i], array[i] = array[j], array[j] = x);
-    return array;
-};
-
 //////////CREATE CLASS//////////
 var method = Game.prototype;
 
@@ -30,7 +17,18 @@ method.getUsername = function(msg){
 	if(typeof msg.from.last_name != "undefined") name += " "+msg.from.last_name;
 	if(typeof msg.from.username != "undefined") name += " (@"+msg.from.username+")";
 	return name
-}
+};
+method.inArray = function(array, key, value){
+	existe = false;
+	for (i = 0; i<array.length && !existe; i++){
+		if (array[i][key] === value) existe = true;
+	}
+	return existe;
+};
+method.shuffleArray = function(array){
+    for(var j, x, i = array.length; i; j = Math.floor(Math.random() * i), x = array[--i], array[i] = array[j], array[j] = x);
+    return array;
+};
 
 //////////GAME//////////
 //createUser: data {user_id, username}, callback
@@ -54,7 +52,9 @@ method.createUser = function (data, callback){
 //getUser: user_id, callback
 method.getUser = function (user_id, callback) {
 	var g_object = this;
-	g_object.db.find('players', {user_id: user_id}, function (array){
+	if (typeof user_id == "number") search = {user_id: user_id};
+	else search = {_id: user_id};
+	g_object.db.find('players', search, function (array){
 		if (!array.length){
 			callback({status: "ERR", msg: "ERR_NOT_IN_GAME"});
 			return;
@@ -68,7 +68,8 @@ method.getUser = function (user_id, callback) {
 
 //leaveUser: player_id, callback
 method.leaveUser = function (player_id, callback){
-	game.db.remove('playersxgame', {player_id: g_object.db.getObjectId(player_id)}, function (res){
+	var g_object = this;
+	g_object.db.remove('playersxgame', {player_id: g_object.db.getObjectId(player_id)}, function (res){
 		if (res.status == "ERR") callback(res);
 		else callback({status: "OK"});
 	});
@@ -127,7 +128,7 @@ method.joinGame = function(data, callback){
 };
 
 //startGame: player_id, game_id, callback
-method.startGame = function (player_id, game_id, callback){
+method.startGame = function (player_id, game_id, msg_id, callback){
 	var g_object = this;
 	//Comprueba que el grupo tenga una partida creada.
 	g_object.db.find('games', {_id: g_object.db.getObjectId(game_id)}, function(r_game) {
@@ -152,7 +153,10 @@ method.startGame = function (player_id, game_id, callback){
 				callback({status: "ERR", msg: "ERR_NOT_ENOUGHT_PLAYERS", extra: {current_players: r_players.length, max_players: r_game[0].n_players}});
 				return;
 			}
-			callback({status: "OK", data: {game: r_game[0], players: r_players}});
+			g_object.db.update('games', {_id: g_object.db.getObjectId(game_id)}, {"msg_id": msg_id, "president_id":  parseInt(r_game[0].president_id)+1 }, function () {
+				r_game[0].president_id = parseInt(r_game[0].president_id)+1;
+				callback({status: "OK", data: {game: r_game[0], players: r_players}});
+			});
 		});
 	});
 };
@@ -182,14 +186,14 @@ method.deleteGame = function (player_id, game_id, callback) {
 };
 
 //ToDo: revisar
-method.leaveGame = function (player_id, callback) {
+method.leaveGame = function (player_id, game_id, callback) {
 	var g_object = this;
-	g_object.db.find('playersxgame', {player_id: g_object.db.getObjectId(player_id)}, function(r_player){
-		if (!r_player.length){
+	g_object.db.count('playersxgame', {player_id: g_object.db.getObjectId(player_id), game_id: g_object.db.getObjectId(game_id)}, function(r_player){
+		if (!r_player){
 			callback({status: "ERR", msg: "ERR_NO_GAME_PARTICIPANT"});
 			return;
 		}
-		g_object.db.find('games', {game_id: g_object.db.getObjectId(r_player[0].game_id)}, function(r_game) {
+		g_object.db.find('games', {_id: g_object.db.getObjectId(game_id)}, function(r_game) {
 			if (!r_game.length) {
 				callback({status: "ERR", msg: "ERR_NO_ACTIVE_GAMES"});
 				return;
