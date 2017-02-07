@@ -1,5 +1,3 @@
-//ToDo: Al consultar la BD usar el callback de 2 parametros (err, response) para propagar errores y usar el metodo del return; para capturarlos
-//ToDo: Donde entra por parametro r_game hay que limitar la informacion que recibe a solo la que va a usar
 var Db = require('./db');
 
 //////////CREATE CLASS//////////
@@ -34,11 +32,13 @@ method.shuffleArray = function(array){
 //createUser: data {user_id, username}, callback
 method.createUser = function (data, callback){
 	var g_object = this;
+	//Comprobamos que el usuario no esté dado de alta
 	g_object.db.count('players', {user_id: data.user_id}, function (count_player) {
 		if (count_player){
 			callback({status: "ERR", msg: "ERR_ALREADY_IN_GAME"});
 			return;
 		}
+		//Damos al usuario de alta
 		g_object.db.insert('players', data, function (res) {
 			if (res.status == "ERR"){
 				callback({status: "ERR", msg: res});
@@ -52,13 +52,16 @@ method.createUser = function (data, callback){
 //getUser: user_id, callback
 method.getUser = function (user_id, callback) {
 	var g_object = this;
+	//Comprobamos si nos envian su ID numerica o alfanumerica
 	if (typeof user_id == "number") search = {user_id: user_id};
 	else search = {_id: user_id};
+	//Buscamos al usuario
 	g_object.db.find('players', search, function (array){
 		if (!array.length){
 			callback({status: "ERR", msg: "ERR_NOT_IN_GAME"});
 			return;
 		}
+		//Comprobamos si ya esta jugando una partida
 		g_object.db.count('playersxgame', {player_uid: user_id}, function(count_player){
 			if (count_player) callback({status: "OK", msg: array[0], playing: true});
 			else callback({status: "OK", msg: array[0], playing: false});
@@ -66,16 +69,7 @@ method.getUser = function (user_id, callback) {
 	});
 };
 
-//leaveUser: player_id, callback
-method.leaveUser = function (player_id, callback){
-	var g_object = this;
-	g_object.db.remove('playersxgame', {player_id: g_object.db.getObjectId(player_id)}, function (res){
-		if (res.status == "ERR") callback(res);
-		else callback({status: "OK"});
-	});
-};
-
-//createGame: data {from_id, type, n_players, n_cardstowin, dictionary}, callback
+//createGame: data {msg_id, room_id, creator_id, n_players, president_id, [more]}, callback
 method.createGame = function(data, callback){
 	var g_object = this;
 	//Buscamos en la tabla games si el grupo desde el que se invoca tiene ya una partida.
@@ -85,18 +79,18 @@ method.createGame = function(data, callback){
 			callback({status: "ERR", msg: "ERR_ACTIVE_GAME"});
 			return;
 		}
+		//Anadimos el juego a la base de datos
 		g_object.db.insert('games', data, function (res) {
 			if (res.status == "ERR"){
 				callback({status: "ERR", msg: res});
 				return;
 			}
-			//ToDo: Preparar tabla 'leyes' con un array random de leyes
 			callback({status: "OK", msg: {game_id: res.insertedId}});
 		});
 	});
 };
 
-//joinGame: data {data.game_id, data.user_id, data.username}, callback
+//joinGame: data {game_id, player_id, player_uid, player_username, [more]}, callback
 method.joinGame = function(data, callback){
 	var g_object = this;
 	//Comprueba que el grupo tenga una partida creada.
@@ -127,7 +121,7 @@ method.joinGame = function(data, callback){
 	});
 };
 
-//startGame: player_id, game_id, callback
+//startGame: player_id, game_id, msg_id, callback
 method.startGame = function (player_id, game_id, msg_id, callback){
 	var g_object = this;
 	//Comprueba que el grupo tenga una partida creada.
@@ -153,6 +147,7 @@ method.startGame = function (player_id, game_id, msg_id, callback){
 				callback({status: "ERR", msg: "ERR_NOT_ENOUGHT_PLAYERS", extra: {current_players: r_players.length, max_players: r_game[0].n_players}});
 				return;
 			}
+			//Iniciamos la partida
 			g_object.db.update('games', {_id: g_object.db.getObjectId(game_id)}, {"msg_id": msg_id, "president_id":  parseInt(r_game[0].president_id)+1 }, function () {
 				r_game[0].president_id = parseInt(r_game[0].president_id)+1;
 				callback({status: "OK", data: {game: r_game[0], players: r_players}});
@@ -161,7 +156,7 @@ method.startGame = function (player_id, game_id, msg_id, callback){
 	});
 };
 
-//deleteGame: game_id, player_id, game_id, callback
+//deleteGame: player_id, game_id, callback
 method.deleteGame = function (player_id, game_id, callback) {
 	var g_object = this;
 	//Comprueba que el grupo tenga una partida creada.
@@ -185,19 +180,31 @@ method.deleteGame = function (player_id, game_id, callback) {
 	});
 };
 
-//ToDo: revisar
+//leaveUser: player_id, callback
+method.leaveUser = function (player_id, callback){
+	var g_object = this;
+	g_object.db.remove('playersxgame', {player_id: g_object.db.getObjectId(player_id)}, function (res){
+		if (res.status == "ERR") callback(res);
+		else callback({status: "OK"});
+	});
+};
+
+//leaveGame: player_id, game_id, callback
 method.leaveGame = function (player_id, game_id, callback) {
 	var g_object = this;
+	//Comprobamos que el usuario pertenezca a la partida
 	g_object.db.count('playersxgame', {player_id: g_object.db.getObjectId(player_id), game_id: g_object.db.getObjectId(game_id)}, function(r_player){
 		if (!r_player){
 			callback({status: "ERR", msg: "ERR_NO_GAME_PARTICIPANT"});
 			return;
 		}
+		//Comprobamos que la partida no este borrada
 		g_object.db.find('games', {_id: g_object.db.getObjectId(game_id)}, function(r_game) {
 			if (!r_game.length) {
 				callback({status: "ERR", msg: "ERR_NO_ACTIVE_GAMES"});
 				return;
 			}
+			//Comprobamos que no sea el creador de la partida
 			if (r_game[0].creator_id.toString() == player_id.toString()){
 				callback({status: "ERR", msg: "ERR_CREATOR_CANT_LEAVE"});
 				return;

@@ -288,7 +288,11 @@ var game = new GameBot(privatedata.url, function (res){
 									bot.answerCallbackQuery(msg.id, "Error inesperado.");
 									return;
 								}
-								//ToDo: editar el mensaje principal
+								var participants = "";
+								for (var user of response){
+									participants += user.player_username+"\n";
+								}
+								bot.editMessageText("Participantes: "+participants, {chat_id: msg.message.chat.id, message_id: msg.message.message_id});
 								bot.answerCallbackQuery(msg.id, "Has abandonado la partida.");
 							});
 						});
